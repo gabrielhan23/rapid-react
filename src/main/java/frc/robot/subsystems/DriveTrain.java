@@ -7,6 +7,11 @@ package frc.robot.subsystems;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFX;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.utils.Constants;
 
@@ -18,8 +23,13 @@ public class DriveTrain extends SubsystemBase {
   private TalonFX backR;
   private TalonFX backL;
 
+  private NavX navX;
+  private DifferentialDriveOdometry odometry;
+  private DifferentialDriveKinematics kinematics;
+  private Pose2d pose;
+
   /** Creates a new DriveTrain. */
-  public DriveTrain() {
+  public DriveTrain(NavX navX) {
     frontR = new TalonFX(Constants.ID.DRIVETRAIN_FRONT_RIGHT);
     frontL = new TalonFX(Constants.ID.DRIVETRAIN_FRONT_LEFT);
     backR = new TalonFX(Constants.ID.DRIVETRAIN_BACK_RIGHT);
@@ -53,6 +63,15 @@ public class DriveTrain extends SubsystemBase {
     frontL.configMotionAcceleration(Constants.DriveTrain.ACCELERATION);
     frontR.configMotionCruiseVelocity(Constants.DriveTrain.CRUISE_VELOCITY);
     frontR.configMotionAcceleration(Constants.DriveTrain.ACCELERATION);
+
+    resetEncoders();
+    this.navX = navX;
+    odometry = new DifferentialDriveOdometry(getHeading());
+    kinematics = new DifferentialDriveKinematics(Units.inchesToMeters(22.625));
+  }
+
+  public Rotation2d getHeading() {
+    return Rotation2d.fromDegrees(-navX.getAngle());
   }
 
   public void arcadeDrive(double x, double y) {
@@ -64,19 +83,19 @@ public class DriveTrain extends SubsystemBase {
     return slowModeOn;
   }
 
-  public boolean climbing(){
+  public boolean climbing() {
     return climbing;
   }
 
   public void toggleSlowMode() {
-    slowModeOn = ! slowModeOn;
+    slowModeOn = !slowModeOn;
   }
 
-  public void setClimbMode(boolean climbMode){
+  public void setClimbMode(boolean climbMode) {
     climbing = climbMode;
   }
 
-  public void climbingTrue(){
+  public void climbingTrue() {
     climbing = true;
   }
 
@@ -103,12 +122,14 @@ public class DriveTrain extends SubsystemBase {
   }
 
   public double getNativeUnitsFromInches(double inches) {
-    return inches * Constants.DriveTrain.MOTOR_TO_WHEEL_REVOLUTION / (Math.PI * Constants.DriveTrain.DRIVE_WHEEL_DIAMETER_INCHES)
+    return inches * Constants.DriveTrain.MOTOR_TO_WHEEL_REVOLUTION
+        / (Math.PI * Constants.DriveTrain.DRIVE_WHEEL_DIAMETER_INCHES)
         * Constants.DriveTrain.SENSOR_UNITS_PER_ROTATION;
   }
 
   public double getInchesFromNativeUnits(double native_units) {
-    return native_units / Constants.DriveTrain.MOTOR_TO_WHEEL_REVOLUTION * (Math.PI * Constants.DriveTrain.DRIVE_WHEEL_DIAMETER_INCHES)
+    return native_units / Constants.DriveTrain.MOTOR_TO_WHEEL_REVOLUTION
+        * (Math.PI * Constants.DriveTrain.DRIVE_WHEEL_DIAMETER_INCHES)
         / Constants.DriveTrain.SENSOR_UNITS_PER_ROTATION;
   }
 
@@ -129,7 +150,10 @@ public class DriveTrain extends SubsystemBase {
 
   @Override
   public void periodic() {
-    // This method will be called once per scheduler run
+    printInches();
+    pose = odometry.update(getHeading(),
+        Units.inchesToMeters(getInchesFromNativeUnits(getLeftEncoderCount())),
+        Units.inchesToMeters(getInchesFromNativeUnits(getRightEncoderCount())));
   }
 
   public void setPosition(double pos) {
@@ -148,4 +172,11 @@ public class DriveTrain extends SubsystemBase {
     frontR.config_kI(slotID, i);
     frontR.config_kD(slotID, d);
   }
+
+  public Pose2d getPose() {
+    System.out.println("X loc: " + pose.getX());
+    System.out.println("Y loc: " + pose.getY());
+    return pose;
+  }
+
 }
